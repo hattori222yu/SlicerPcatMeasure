@@ -1,0 +1,6 @@
+
+This extension is distributed under the same license as 3D Slicer.
+
+3D Slicer is licensed under a BSD-style open source license.
+
+See: https://www.slicer.org/pages/License
