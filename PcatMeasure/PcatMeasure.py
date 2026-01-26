@@ -112,7 +112,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
 
         # button
         self.loadCTButton2 = qt.QPushButton("[1] : Get CT Node")
-        self.addPointButton = qt.QPushButton("[2] : Starting Point")
+        self.addPointButton = qt.QPushButton("Manual starting Point")
         self.loadSegButton2 = qt.QPushButton("Load Seg (file dialog)")
         self.loadSegButton3 = qt.QPushButton("[2]:Select branches")
         self.loadSegButton4 = qt.QPushButton("[3]:Analysis PCAT")
@@ -228,9 +228,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         label.setStyleSheet("font-weight: bold;")
         formLayout.addRow(label, self.loadCTButton2)
 
-        #label = qt.QLabel("")
-        #label.setStyleSheet("font-weight: bold;")
-        #formLayout.addRow(label, self.addPointButton)
+        
            
         pcatTitle = qt.QLabel("PCAT range")
         pcatTitle.setStyleSheet("font-weight: bold;")
@@ -255,7 +253,9 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         label = qt.QLabel("")
         label.setStyleSheet("font-weight: bold;")
         formLayout.addRow(label, self.resetViewButton)
-        
+        label = qt.QLabel("")
+        label.setStyleSheet("font-weight: bold;")
+        formLayout.addRow(label, self.addPointButton)
         label = qt.QLabel("")
         label.setStyleSheet("font-weight: bold;")
         
@@ -277,7 +277,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         self.resetViewButton.connect("clicked()",self.onResetViewButtonClicked)
         self.addPointButton.connect("clicked(bool)", self.onEnableMarkups)
         self.clearButton.clicked.connect(self.onClearAllNodes)
-        self.clearButton2.clicked.connect(self.onClearSegNodes)
+        self.clearButton2.clicked.connect(self.onClearNodes_except_CT)
         #self.clearButton3.clicked.connect(self.onClearcenterlineNodes)
         self.rcaRadio.toggled.connect(self.onArteryChanged)
         self.ladRadio.toggled.connect(self.onArteryChanged)
@@ -323,7 +323,6 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
    
 
     def clearCaseNodes(self,caseNodeIDs, keepNodeIDs=None):
-        import slicer
     
         keepNodeIDs = set(keepNodeIDs or [])
     
@@ -335,16 +334,15 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             if node:
                 slicer.mrmlScene.RemoveNode(node)
     
-        # 残ったものだけ再登録
+        # Re-register only the remaining items
         caseNodeIDs = [
             nid for nid in caseNodeIDs
             if slicer.mrmlScene.GetNodeByID(nid)
         ]   
             
-#%%%    ボタン押した時の動作    
-    #[1] : Get CT Node button sceneからかdialogからかで処理変えている    
+#%%%    signals
+    #[1] : Get CT Node button scene or dialog   
     def onLoadCT(self):
-        import slicer
         if self.loadCheckBox.checked:
             self.ctNode = self.ctSelector.currentNode()
             if self.ctNode is None:
@@ -354,9 +352,6 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             self.ctPathLabel.setText(f"CT (Scene): {self.ctNode.GetName()}")
         
             slicer.util.setSliceViewerLayers(background=self.ctNode)
-            #slicer.app.layoutManager().resetSliceViews()
-            #slicer.app.layoutManager().resetThreeDViews()
-            
             storageNode = self.ctNode.GetStorageNode()
             if storageNode and storageNode.GetFileName():
                 self.ct_file_path = storageNode.GetFileName()
@@ -398,10 +393,10 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             self.keepIDs.append(self.ctNode.GetID())
 
             logging.info("--Loaded CT")
-            #self.keepIDs = [self.ctNode.GetID()]
+            
             
     
-#%%    # radio buttonの設定        
+#%%   radio button
     def onArteryChanged(self):
         if self.rcaRadio.isChecked():
             self.coronary_artery_name = "RCA"
@@ -425,67 +420,62 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             self.start_mm = 0
             self.end_mm = 40
     
-        # スライダーへ反映
+        # Reflected on slider
         self.startSlider.value = self.start_mm
         self.endSlider.value = self.end_mm
         
     def onStartSliderChanged(self, value):
         self.start_mm = value
-    
-        # start <= end を保証
         if self.start_mm > self.end_mm:
             self.end_mm = self.start_mm
             self.endSlider.value = self.end_mm
+            
     def onEndSliderChanged(self, value):
         self.end_mm = value
-    
         if self.end_mm < self.start_mm:
             self.start_mm = self.end_mm
             self.startSlider.value = self.start_mm
 #%%    #view reset button
     def onResetViewButtonClicked(self):
         lm = slicer.app.layoutManager()
-    
         lm.sliceWidget("Red").sliceLogic().GetSliceNode().SetOrientationToAxial()
         lm.sliceWidget("Green").sliceLogic().GetSliceNode().SetOrientationToCoronal()
         lm.sliceWidget("Yellow").sliceLogic().GetSliceNode().SetOrientationToSagittal()
 #%%    #goto cccs module   
     def onBackButtonClicked(self):
-        
         ###slicer.util.reloadScriptedModule("CoronaryCenterlineCrossSection")  this is forced
         ccWidget = slicer.modules.coronarycenterlinecrosssection.widgetRepresentation().self()
         ccWidget.logic.reset()
         ccWidget.resetWidgetState()
         slicer.util.selectModule("CoronaryCenterlineCrossSection")
 
-#%% 起始部の点を配置する
+#%% Place the starting point
     def onEnableMarkups(self):
-        # 既存の Markups ノードを取得または作成
+        # Get or create an existing Markups node
         markupsNode = slicer.mrmlScene.GetFirstNodeByName("PickedPoints")
         if not markupsNode:
             markupsNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode", "PickedPoints")
     
-        # Interaction Node を取得
+        # get Interaction Node 
         interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
     
-        # このノードを現在のPlaceターゲットに設定
+        # Set this node as the current Place target
         interactionNode.SetCurrentInteractionMode(interactionNode.Place)
 
-        # Markupsを配置対象に指定
+        # Specify Markups as the placement target
         slicer.modules.markups.logic().SetActiveListID(markupsNode)
-#%% データ削除
+#%% Clear node
     def onClearAllNodes(self):
-        import slicer
         slicer.mrmlScene.Clear(0)
         logging.info("All displayable nodes cleared.")
         
-    def onClearSegNodes(self):
+    def onClearNodes_except_CT(self):
         self.clearCaseNodes(caseNodeIDs=self.caseNodeIDs_2,keepNodeIDs=self.keepIDs)
         logging.info("All nodes except the CT have been cleared.")    
     
     
         
-#%% inflammatinoをjpeg化する  
+#%% inflammatino2jpeg
     def onShowInflammation(self):
         volumeNode = self.ctNode
         segmentationNode = self.PCAT_seg_filtered
@@ -505,7 +495,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             return
     
         #
-        # Original CT を PCAT 部分だけ色付けした RGB 画像に変換
+        #Convert the original CT image into an RGB image with only the PCAT part colored.
         #
         coloredNode = self.logic.createColorizedOriginal(
             volumeNode,
@@ -514,14 +504,14 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         )
     
         #
-        # SliceView に表示（Foreground に色付き CT）
+        # Display in SliceView (Colored CT in Foreground)
         #
         lm = slicer.app.layoutManager()
         for viewName in lm.sliceViewNames():
             sv = lm.sliceWidget(viewName).sliceLogic()
             sv.GetSliceCompositeNode().SetBackgroundVolumeID(volumeNode.GetID())
             sv.GetSliceCompositeNode().SetForegroundVolumeID(coloredNode.GetID())
-            sv.GetSliceCompositeNode().SetForegroundOpacity(1.0)  # 完全に色付き CT を表示
+            sv.GetSliceCompositeNode().SetForegroundOpacity(1.0)  
     
         slicer.util.infoDisplay("PCAT-colored CT image created and displayed.")
      
@@ -534,16 +524,9 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         logging.info("--Selected branch IDs: %s", self.selected_ids)
         logging.info("--Total length: %s", self.total_selected_length)
     
-    
-    
-    
-
-        
-
-#%% selectbranchボタンを押したら 
+#%% selectbranch button
     def onSelect_branches(self):
         logging.info("step0:Analysis target = %s", self.coronary_artery_name)
-        import slicer
         if self.loadCheckBox.checked==False:
             
         
@@ -560,8 +543,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
     
             self.segPathLabel.setText(f"Segmentation: {filePath}")
         
-        
-        referenceVolumeNode = self.ctNode  # CT
+        referenceVolumeNode = self.ctNode  
         
         ijkToRas = vtk.vtkMatrix4x4()
         referenceVolumeNode.GetIJKToRASMatrix(ijkToRas)
@@ -571,8 +553,6 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             for r in range(4)])
                 
         
-        
-        
         endpointName = "Endpoints"
         endpointmodelName = "Endptmodel"
         centermodelName = "Model"
@@ -580,11 +560,11 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         centertableName = "Properties"
         centercurveName = "　  cc"
         
-        # 保存先フォルダ
+        # save folder
         base_dir = os.path.dirname(os.path.abspath(__file__))
         self.save_dir_output=os.path.join(base_dir,"output")
         
-        # フォルダがなければ作成
+        # If the folder does not exist, create it
         os.makedirs(self.save_dir_output, exist_ok=True)
         safe_ct_name = self.logic.sanitize_filename(self.ct_file_name)
         safe_ct_name = safe_ct_name.replace(".", "_")
@@ -593,7 +573,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         self.save_dir = os.path.join(self.save_dir_output, safe_ct_name)
         os.makedirs(self.save_dir, exist_ok=True)
         
-        # ファイルパス
+        # file path
         save_path = os.path.join(self.save_dir, "01_inputSurfacePolyData.vtk")
         # Slicer add node
         endpointModelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode", endpointmodelName)
@@ -607,7 +587,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         self.caseNodeIDs.append(centerlinePropertiesTableNode.GetID())
         self.caseNodeIDs.append(centerlineCurveNode.GetID())
 
-        #球体を非表示
+        #Hide Sphere
         #centerlineCurveNode.GetDisplayNode().SetVisibility(False)
 
         # Step1: Load Segmentation: From Path to 'vtkMRMLSegmentationNode' type        
@@ -625,11 +605,11 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         else:
             seg_path=filePath
             self.segmentationNode = slicer.util.loadSegmentation(seg_path)
-            # ファイルロード時も SegmentSelector にセット
+            # Set to SegmentSelector when loading a file
             self.segmentSelector.setSegmentationNode(self.segmentationNode)
             segmentID = self.segmentSelector.currentSegmentID()
             if not segmentID:
-                # 自動フォールバック（1つ目）
+                
                 segmentation = self.segmentationNode.GetSegmentation()
                 if segmentation.GetNumberOfSegments() == 0:
                     slicer.util.errorDisplay("No segments in segmentation")
@@ -639,12 +619,9 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         # Step2: SegmentationNode to vtkPolyData
         logging.info("step2:SegmentationNode to vtkPolyData")
         inputSurfacePolyData = self.extractLogic.polyDataFromNode(self.segmentationNode, segmentID)
-        #logging.info('DEBUG', inputSurfacePolyData)
         SAVE_VTK=True
         save_poly(SAVE_VTK, inputSurfacePolyData, os.path.join(self.save_dir, f"01_inputSurfacePolyData_{self.coronary_artery_name}.vtk"))
-                 
-               
-        
+             
         targetNumberOfPoints = 5000.0
         decimationAggressiveness = 4 
         subdivideInputSurface = False
@@ -658,7 +635,6 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         # Step3: Extract Centerline Network (Approximated Centerline)
         logging.info("step3:Extract Centerline Network")
         endPointsMarkupsNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode", endpointName)
-        #非表示
         endPointsMarkupsNode.GetDisplayNode().SetVisibility(False)
         networkPolyData = self.extractLogic.extractNetwork(preprocessedPolyData, endPointsMarkupsNode, computeGeometry=True)  # Voronoi 
         # Create Centerline Model
@@ -671,40 +647,30 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         #startPointPosition=None
         
         startPointPosition_list = []
+        #######################################
         
-        """#手動でマークアップをする場合。
         markupsNode = slicer.mrmlScene.GetFirstNodeByName("PickedPoints")
-
-        n = markupsNode.GetNumberOfControlPoints()
-        for i in range(n):
-            ras = [0.0, 0.0, 0.0]
-            markupsNode.GetNthControlPointPositionWorld(i, ras)  # 
-            startPointPosition_list.append(ras)
-        aortaCenter = [0, 0, 0]
-        startPointPosition = self.logic.closest_point(startPointPosition_list, aortaCenter)
-        """
-        #startPointPosition = startPointPosition_list[0]
-        #初期値
-        
-        #複数マークアップがある場合に一番近い点を取得
-        
-        
         paramNode = slicer.mrmlScene.GetFirstNodeByName("PCATParameters")
-        if not paramNode:
-            print("return1")
-            return None
+        if paramNode:
+            logging.info("--paramNode")
     
-        s = paramNode.GetParameter("CenterlineStartPointRAS")
-        if not s:
-            print("return2")
-            return None
-        startPointPosition = np.array([float(v) for v in s.split(",")])
-        
+            s = paramNode.GetParameter("CenterlineStartPointRAS")
+            if not s:
+                return None
+            startPointPosition = np.array([float(v) for v in s.split(",")])
+            
+        elif markupsNode and markupsNode.GetNumberOfControlPoints() > 0:
+            logging.info("--markupsNode")
+            n = markupsNode.GetNumberOfControlPoints()
+            for i in range(n):
+                ras = [0.0, 0.0, 0.0]
+                markupsNode.GetNthControlPointPositionWorld(i, ras)  # 
+                startPointPosition_list.append(ras)
+            aortaCenter = [0, 0, 0]
+            startPointPosition = self.logic.closest_point(startPointPosition_list, aortaCenter)
+        ####################################
         self.coordinates.append(startPointPosition)
-        #print(self.coordinates)
-        #
-        #print("startPoint",startPoint)
-        #print("startPointPosition",startPointPosition)
+        
         endpointPositions = self.extractLogic.getEndPoints(networkPolyData, startPointPosition) # AutoDetect the endpoints. type: List
         
         endPointsMarkupsNode.RemoveAllControlPoints()
@@ -720,7 +686,6 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         # Step6: Extract centerlineCurves
         logging.info("step6:Extract centerlineCurves")
         self.mergedCenterlines, centerlineProperties, self.cell_pt = self.extractLogic.createCurveTreeFromCenterline(centerlinePolyData, centerlineCurveNode, centerlinePropertiesTableNode) 
-            
         save_poly(SAVE_VTK, self.mergedCenterlines, os.path.join(self.save_dir,f"03_mergedCenterlines_{self.coronary_artery_name}.vtk"))
         
         
@@ -728,9 +693,9 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         #####################################################
         # Preliminary for the Radius Calculation in each curve
-        #各セル（枝）ごとの点IDを取得
-        #mergedCenterlines の各セル（曲線単位）に含まれる 点のインデックスリスト を保存
-        #後で、曲線ごとの点列の抽出や幾何量の関連付けに使う
+        #Get the point ID for each cell (branch).
+        #Save the index list of points contained in each cell (curve unit) of mergedCenterlines.
+        #Use this later to extract point sequences for each curve and associate geometric quantities.
         #####################################################
         self.ce_ll_pt_LIST = {}
         for cell in range(self.mergedCenterlines.GetNumberOfCells()):
@@ -780,9 +745,9 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         groupIdsArrayName = 'GroupIds'
         groupIdsArray = self.mergedCenterlines.GetCellData().GetArray(groupIdsArrayName)
     
-        # 2. ユニークな GroupIds を取得
+        # Unique group ids get
         uniqueGroupIds = list(set(groupIdsArray.GetTuple1(i) for i in range(groupIdsArray.GetNumberOfTuples())))
-        #uniqueGroupIds.sort()  # 一応順番揃える
+        #uniqueGroupIds.sort()  # junnbansoroeru
         numGroups = len(uniqueGroupIds)
         
         
@@ -795,17 +760,13 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             diffs = np.diff(points_branch, axis=0)
             segment_lengths = np.linalg.norm(diffs, axis=1)
             total_length = np.sum(segment_lengths)
-            #logging.info("i",i,"total_length",total_length)
             total_lengths.append(total_length)
-        #self.coronary_artery_name="RCA"
-        #logging.info("total_lengthが1なら分岐なし、１より多いなら分岐あるとして条件分岐するか？",total_lengths)
-        #複数分岐がある場合やLCA→LAD,LCX分岐のセグメンテーションの場合ある程度自動判定してやる
+        
+        
+        #In the case of multiple branches or segmentation of LCA → LAD, LCX branches, some automatic judgment is performed.
         """
         if len(total_lengths)>1:
-            #logging.info("分岐ある旧バージョン")
-            ###############################################################
-            #もしかしたらこのbifurcation_idsの分岐はいらないと思う．
-            ###############################################################
+            
             if self.coronary_artery_name in ("LAD", "LCX"):
                 bifurcation_ids = self.logic.find_first_bifurcation(mergedCenterlines=self.mergedCenterlines,
                                                                     coord_mm=self.coord_mm,
@@ -836,9 +797,8 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                                                                    coord_mm=self.coord_mm,
                                                                    target_len=40.0,
                                                                    angle_th=np.deg2rad(30))
-            #branch_id はとりあえず自動で選んだPCAT領域に対応するID
+            #branch_id is the ID corresponding to the automatically selected PCAT area
         else:
-            #logging.info("1本バージョン")
             
             cumulative_length = 0
             for i in range(len(total_lengths)):
@@ -869,14 +829,11 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                 if cumulative_length >= 50:
                     break
         
-        
         logging.info("--get branch ID is %s",self.default_branch_id)
         
         
-        
-        #CT画像上で取得した起始部の座標を取得###################################################
-        """#手動でマークアップをする場合。
-        # Markupsノードを取得
+        """#manual marck up
+        # get Markupsnode
         if not markupsNode:
             slicer.util.warningDisplay("No markups found. Please enable markups and place points first.")
             return
@@ -895,14 +852,8 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
     
         """
         
-       
-    
-    
-    
-        
-        ##############元のコードから．長さとかIDを表示   VIL=>view_id_lengthの略
+        #From the original code. Show length and ID.   VIL=>view_id_length
         group_ids = self.mergedCenterlines.GetCellData().GetArray(groupIdsArrayName)
-        #logging.info("group_ids",group_ids)
         points = self.mergedCenterlines.GetPoints()
         vivid_colors = [(1, 0, 0),(0, 1, 0),(0, 0, 1),(1, 1, 0),(1, 0, 1),(0, 1, 1),(1, 0.5, 0),(0.5, 0, 1),
                          (1, 0, 0.5),(0.5, 0.5, 0),(0, 0.5, 1),(0, 1, 0.5),(0.5, 1, 0), (1, 0.25, 0),(0.25, 0, 1),
@@ -913,13 +864,13 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             group_VIL = group_ids.GetValue(i)
             branch_id_VIL = uniqueGroupIds.index(group_VIL)
             
-            # 差分をとってユークリッド距離を計算
+            # Take the difference and calculate the Euclidean distance
             points_branch_VIL  = self.coord_mm[i]  # shape = (N, 3)            
-            diffs_VIL = np.diff(points_branch_VIL, axis=0)  # 連続する点の差分ベクトル（N-1, 3）
-            segment_lengths_VIL = np.linalg.norm(diffs_VIL, axis=1)  # 各セグメントの長さ
-            total_length_VIL = np.sum(segment_lengths_VIL)  # 合計
+            diffs_VIL = np.diff(points_branch_VIL, axis=0)  # Difference vector between consecutive points（N-1, 3）
+            segment_lengths_VIL = np.linalg.norm(diffs_VIL, axis=1)  # The length of each segment
+            total_length_VIL = np.sum(segment_lengths_VIL)  #sum
          
-            # ブランチの中点のインデックスを取得
+            # Get the index of the midpoint of the branch
             mid_index_VIL = cell_VIL.GetNumberOfPoints() // 2
             point_id_VIL = cell_VIL.GetPointId(mid_index_VIL)
             position_VIL = points.GetPoint(point_id_VIL)
@@ -927,7 +878,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             text_source = vtk.vtkVectorText()
             text_source.SetText(f"→{branch_id_VIL} [{total_length_VIL:.1f}mm]")
             
-            # 厚みを付ける
+            # Add thickness
             extrude = vtk.vtkLinearExtrusionFilter()
             extrude.SetInputConnection(text_source.GetOutputPort())
             extrude.SetExtrusionTypeToNormalExtrusion()
@@ -952,33 +903,22 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             camera = renderer.GetActiveCamera()
             text_actor.SetCamera(camera)
             
-            # アンチエイリアス強化
+            # Enhanced anti-aliasing
             slicer.app.layoutManager().threeDWidget(0).threeDView().renderWindow().SetMultiSamples(8)
             renderer.ResetCameraClippingRange()
             slicer.app.layoutManager().threeDWidget(0).threeDView().renderWindow().Render()
             
-            
-            
             self.textActors.append(text_actor)            
-                        
-            
-            
-            
-            
-            
-        
+                       
         logging.info("step9:check branch")
     
-        
         self.total_selected_length = 0.0
-            
-        
+                
         displayNode = self.segmentationNode.GetDisplayNode()
         if displayNode:
             displayNode.SetVisibility3D(False)
         
-        
-        
+        #chexk branch ids
         showMultiCheckPopup(
             total_lengths,
             default_ids=self.default_branch_id,
@@ -987,50 +927,49 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         )
         
         
-#%% analysys pcatを押したら        
-        
+#%% analysys pcat
     def onAnalysys_pcat(self):
         
-        #selecetedIDSで選んだbrannchのcenterlineの座標を連結
-        points_culmulative_mm =  np.concatenate([self.coord_mm[i] for i in self.selected_ids], axis=0)#coord_mm[self.branch_id]  # shape = (N, 3)
-        points_culmulative_voxel =  np.concatenate([self.coord_voxel[i] for i in self.selected_ids], axis=0)#coord_voxel[self.branch_id]  # shape = (N, 3)
+        #Concatenate the coordinates of the centerline of the branch selected by selectedIDS
+        points_culmulative_mm =  np.concatenate([self.coord_mm[i] for i in self.selected_ids], axis=0)
+        points_culmulative_voxel =  np.concatenate([self.coord_voxel[i] for i in self.selected_ids], axis=0)
         
         ###############################
-        #coordinates変数はRASorLAS座標．
-        #points_culmulative_voxelはIJK座標なので変換が必要
+        #coordinates:RAS or LAS
+        #points_culmulative_voxel:IJK  need convert
         ###############################
-        #マークアップスの座標をRASに変換
+        #Convert markup coordinates to RAS
         ras_point = self.coordinates[0]  # [-14.61, 204.66, 105.45]
         
-        # RAS→IJK行列を取得
+        # Get RAS → IJK matrix
         rasToIJK = vtk.vtkMatrix4x4()
         self.ctNode.GetRASToIJKMatrix(rasToIJK)
         
-        # 同次座標で計算
+        # Calculation in homogeneous coordinates
         ijk_h = [0, 0, 0, 1]
         rasToIJK.MultiplyPoint([ras_point[0], ras_point[1], ras_point[2], 1], ijk_h)
         
-        # 最初の3つが IJK
+        # The first three are IJK
         ijk = ijk_h[:3]
         
-        # 必要なら整数にする
+        # Convert to an integer
         ijk_int = [round(v) for v in ijk]
         
-        #RAS 形式
+        #RAS 
         #start_corrdinate=cal_start_point(coordinates[0],points_culmulative_voxel) 
         
-        #IJK　形式
+        #IJK　
         start_corrdinate=cal_start_point(ijk_int,points_culmulative_voxel)
         
         points_culmulative=points_culmulative_mm[start_corrdinate:,:]
        
-        # 各点の差分ベクトル（連続する点の移動）
+        # Difference vector for each point
         diffs_culmulative = np.diff(points_culmulative, axis=0)  # (N-1, 3)
 
-        # 各区間の長さ（ユークリッド距離）
+        # Length of each section
         segment_lengths_culmulative = np.linalg.norm(diffs_culmulative, axis=1)  # (N-1,)
 
-        # 累積距離の配列：先頭に0を付けて [0, d1, d1+d2, ...]
+        # Accumulative distance array: with leading zeros [0, d1, d1+d2, ...]
         cumulative_distances = np.insert(np.cumsum(segment_lengths_culmulative), 0, 0.0)  # shape = (N,)
         
         if self.coronary_artery_name=="RCA":
@@ -1039,11 +978,9 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         else:
             mask_PCAT = (cumulative_distances >= self.start_mm) & (cumulative_distances <= self.end_mm)
             
-        # まず各branchのpoint idリストを順番に取り出して
+        # First, extract the point id list of each branch in order.
         lists = [self.ce_ll_pt_LIST[bid] for bid in self.selected_ids]
-        #logging.info("self.selected_ids",self.selected_ids)
-        # それらをまとめて1次元のnumpy配列にする
-        point_ids = np.array([pid for sublist in lists for pid in sublist])  # 　←だと分岐のところの点が重複している。多分重複はよくなさそう       
+        point_ids = np.array([pid for sublist in lists for pid in sublist])  
         
         
         points_vtk_array = self.mergedCenterlines.GetPoints().GetData()
@@ -1051,48 +988,32 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         point_ids_after_start_selected_=point_ids[start_corrdinate:]
         
-        ###########################################
-        # 区間を絞る（10〜20mm）
-        ###########################################
+        
         selected_ids2 = point_ids_after_start_selected_[mask_PCAT]
 
         cumulative_distance_mask=cumulative_distances[mask_PCAT]
         if selected_ids2.shape[0] < 2:
             raise ValueError("need two point data")
-            
-        ############################################
-        # 新しい vtkPoints と polyLine を作る
-        ############################################
+        
         new_points = vtk.vtkPoints()
         new_lines = vtk.vtkCellArray()
                              
-        ############################################
-        #                   
-        # 点を登録
-        ############################################
-        id_map = {}  # 元のpoint_id → 新しい順番
+        
+        id_map = {}  
         for i, pid in enumerate(selected_ids2):
-            #logging.info(i,pid)
             coord = self.points_np[pid]
             new_points.InsertNextPoint(coord)
             id_map[pid] = i    
             
-        # polyline作成（直線的な連続接続）
-        ###########################################
+        
         line = vtk.vtkPolyLine()
         line.GetPointIds().SetNumberOfIds(len(selected_ids2))
         for i in range(len(selected_ids2)):
             line.GetPointIds().SetId(i, i)
         new_lines.InsertNextCell(line)
-        ############################################
-        # vtkPolyData に登録
-        ############################################
         new_polydata = vtk.vtkPolyData()
         new_polydata.SetPoints(new_points)
         new_polydata.SetLines(new_lines)
-        ############################################
-        # vtkとPCATを測定する範囲をvtkとして保存
-        ############################################
         writer = vtk.vtkPolyDataWriter()
         if self.coronary_artery_name=="RCA":
 
@@ -1102,11 +1023,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         writer.SetInputData(new_polydata)
         writer.Write()
         
-        ##################################################################################################################################
-        #　ここからextract pcat2
-        ##################################################################################################################################
-        #radius_arr=>radius_data
-        #cell_pt=>cell_id_data
+        #extract pcat 2
         logging.info("step10:create artery & PCAT")
         radius_data=self.radius_arr
         cell_id_data=self.cell_pt
@@ -1121,14 +1038,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         branch_0_radius_PCAT=branch_0_radius[mask_PCAT]  
         
         
-        # === RAS → IJK 変換 ===
-        
-        ##################元のコードはこれ
-        #coord_mm = np.hstack([branch_0_coords_PCAT, np.ones((len(branch_0_coords_PCAT), 1))])
-        #coord_voxel = (inv_affine @ coord_mm.T).T[:, :3]
-        #coord_voxel = np.round(coord_voxel).astype(int)
-        #coord_voxel=np.abs(coord_voxel)
-        ##################
+        #RAS → IJK
         ras_to_ijk = vtk.vtkMatrix4x4()
         self.ctNode.GetRASToIJKMatrix(ras_to_ijk)
         
@@ -1143,10 +1053,11 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         coord_voxel = ras_to_ijk_np(branch_0_coords_PCAT)
                 
                             
-        #半径に応じた血管とPCAT領域を作成．なお，tubepolyデータはModelデータになっている
+        #Create blood vessels and PCAT regions according to radius.
         import inspect
         tube_polydata = create_curved_cylinder_mask(branch_0_coords_PCAT, branch_0_radius_PCAT*3.0)
-        logging.info("--Tube Points(not zero): %s", tube_polydata.GetNumberOfPoints())  # ← 0でないこと
+        # Check that it is not 0
+        logging.info("--Tube Points(not zero): %s", tube_polydata.GetNumberOfPoints())  
         if tube_polydata.GetNumberOfPoints() == 0:
             raise ValueError("Tube Points zero")
              
@@ -1157,38 +1068,29 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                         
         logging.info("step11:extract PCAT area")
         
-        # tube_polydata は RAS 座標の PolyData
+        # tube_polydata is RAS corrdinate PolyData
         modelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
         modelNode.SetAndObservePolyData(tube_polydata)
         modelNode.SetName("seg_artery_PCAT")
         
         segNode_artery_PCAT = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "Artery_seg")
-        # セグメンテーションの座標系を CT と合わせる（RAS）
         segNode_artery_PCAT.SetReferenceImageGeometryParameterFromVolumeNode(self.ctNode)
-        # モデルをセグメントとして追加
-        slicer.modules.segmentations.logic().ImportModelToSegmentationNode(
-            modelNode, segNode_artery_PCAT
-            )         
-        # ---------------------------------------------------
-        # 1) 新しい SegmentationNode に2つを結合
-        # ---------------------------------------------------
+        slicer.modules.segmentations.logic().ImportModelToSegmentationNode(modelNode, segNode_artery_PCAT)         
+        # Combine the two into a new SegmentationNode
         seg_artery=self.segmentationNode
         mergedSeg = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "MergedSeg")
         mergedSeg.SetReferenceImageGeometryParameterFromVolumeNode(self.ctNode)
         
         logic = slicer.modules.segmentations.logic()
         
-        # 2) A -> LabelMap にエクスポート
+        # A -> LabelMap
         labelA = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
-        # ExportAllSegmentsToLabelmapNode か ExportVisibleSegmentsToLabelmapNode のどちらか環境で使える方を
-        # 
         try:
             logic.ExportAllSegmentsToLabelmapNode(seg_artery, labelA, self.ctNode)
         except Exception:
             logic.ExportVisibleSegmentsToLabelmapNode(seg_artery, labelA, self.ctNode)
-        #logging.info("Exported seg_artery ->", labelA.GetName(), labelA.GetID())
         
-        # 3) B -> LabelMap にエクスポート
+        # B -> LabelMap
         labelB = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
         try:
             logic.ExportAllSegmentsToLabelmapNode(segNode_artery_PCAT, labelB, self.ctNode)
@@ -1199,11 +1101,11 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         seg = mergedSeg.GetSegmentation()
         segmentIdA = seg.GetNthSegmentID(seg.GetNumberOfSegments() - 1)
 
-        # 5) labelB を mergedSeg に import
+        # labelB ->  mergedSeg 
         logic.ImportLabelmapToSegmentationNode(labelB, mergedSeg)
         segmentIdB = seg.GetNthSegmentID(seg.GetNumberOfSegments() - 1)
 
-        # 6) 確認：mergedSeg の segment list を表示
+        # mergedSeg segment list
         ids = seg.GetSegmentIDs()
 
         workSeg_sub = self.logic.cloneSegmentation(mergedSeg, "work_PCAT_subtract",self.ctNode)
@@ -1219,27 +1121,16 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(labelNode,PCAT_seg)
         
-        # cleanup
-        #slicer.mrmlScene.RemoveNode(labelNode)
-        #slicer.mrmlScene.RemoveNode(workSeg_sub)
+        # for cleanup
         self.caseNodeIDs_2.append(PCAT_seg.GetID())
-
         self.caseNodeIDs.append(segNode_artery_PCAT.GetID())
         self.caseNodeIDs.append(labelNode.GetID())
         self.caseNodeIDs.append(workSeg_sub.GetID())
         self.caseNodeIDs.append(modelNode.GetID())
-        #self.caseNodeIDs.append(PCAT_seg.GetID())
-        #self.keepIds.append(PCAT_seg.GetID())
-
-
-        
-        
+      
         workSeg_int = self.logic.cloneSegmentation(mergedSeg, "work_PCAT_intersect",self.ctNode)
         self.caseNodeIDs.append(workSeg_int.GetID())
 
-        
-        
-        
         self.logic.intersectSegment(workSeg_int,self.ctNode,segmentIdB,segmentIdA)
         
         PCAT_artery_seg = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "PCAT_artery_seg")
@@ -1251,21 +1142,10 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(labelNode,PCAT_artery_seg)
         
-        # cleanup
-        #slicer.mrmlScene.RemoveNode(labelNode)
-        #slicer.mrmlScene.RemoveNode(workSeg_int)
+        # for cleanup
         self.caseNodeIDs.append(PCAT_artery_seg.GetID())
-
         self.caseNodeIDs.append(labelNode.GetID())
         self.caseNodeIDs.append(workSeg_int.GetID())
-
-                
-        
-        # ---- 5) 不要な labelNode を削除 ----
-        #slicer.mrmlScene.RemoveNode(labelA)
-        #slicer.mrmlScene.RemoveNode(labelB)
-        #slicer.mrmlScene.RemoveNode(labelNode)
-        #slicer.mrmlScene.RemoveNode(mergedSeg)
         self.caseNodeIDs.append(labelA.GetID())
         self.caseNodeIDs.append(labelB.GetID())
         self.caseNodeIDs.append(labelNode.GetID())
@@ -1279,24 +1159,19 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             displayNode.SetVisibility(False)   
         
         
-        ######################################################
-        # 作成したPCAT_segは円柱なので，閾値処理した場合の形状にする
-        ######################################################
+        
+        # The created PCAT_seg is a cylinder, so we will make it the shape it would be if we processed it with a threshold.
         self.PCAT_seg_filtered  = self.logic.cloneSegmentation(PCAT_seg, "PCAT_filterd",self.ctNode)        
         
-        segmentEditorNode = slicer.mrmlScene.AddNewNodeByClass(
-            "vtkMRMLSegmentEditorNode"
-        )
+        segmentEditorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentEditorNode")
         segmentEditorNode.SetAndObserveSegmentationNode(self.PCAT_seg_filtered )
         segmentEditorNode.SetAndObserveMasterVolumeNode(self.ctNode)
         
         segmentation = self.PCAT_seg_filtered .GetSegmentation()
         self.fat_segmentId = segmentation.GetNthSegmentID(0)
         
-        # enum を数値指定
         segmentEditorNode.SetMaskMode(1)   # InsideSingleSegment
         segmentEditorNode.SetMaskSegmentID(self.fat_segmentId)
-        
         segmentEditorNode.SetOverwriteMode(2)  # OverwriteAllSegments
         
         segmentEditorWidget = slicer.qMRMLSegmentEditorWidget()
@@ -1313,14 +1188,10 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         effect.self().onApply()
         
-        # cleanup
+        # for cleanup
         segmentEditorWidget = None
-        #slicer.mrmlScene.RemoveNode(segmentEditorNode)
         self.caseNodeIDs.append(segmentEditorNode.GetID())
         self.caseNodeIDs_2.append(self.PCAT_seg_filtered.GetID())
-        #self.keepIDs.append(PCAT_seg_filtered.GetID())
-        
-        
         
         segmentationdisp = PCAT_seg.GetSegmentation()
         segmentIDdisp = segmentationdisp.GetNthSegmentID(0)  # or segmentation.GetSegmentIdBySegmentName("PCAT")
@@ -1331,21 +1202,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         segmentdisp = segmentationdisp.GetSegment(segmentIDdisp)
         segmentdisp.SetColor(0.0, 1.0, 1.0)   
         
-        # 赤 (1.0, 0.0, 0.0)
 
-        # 緑segmentdisp.SetColor(0.0, 1.0, 0.0)
-        
-        # 青segmentdisp.SetColor(0.0, 0.0, 1.0)
-        
-        # 黄色segmentdisp.SetColor(1.0, 1.0, 0.0)
-        
-        # シアンsegmentdisp.SetColor(0.0, 1.0, 1.0)
-        
-        # マゼンタsegmentdisp.SetColor(1.0, 0.0, 1.0)
-        
-        # 白segmentdisp.SetColor(1.0, 1.0, 1.0)
-        
-        
         segmentationdisp2 = PCAT_artery_seg.GetSegmentation()
         segmentIDdisp2 = segmentationdisp2.GetNthSegmentID(0)
         # or segmentation.GetSegmentIdBySegmentName("PCAT")
@@ -1357,17 +1214,14 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         logging.info("--PCAT HU: %s", PCAT_value)
          
-        pcatLabelNode = slicer.mrmlScene.AddNewNodeByClass(
-            "vtkMRMLLabelMapVolumeNode",
-            "PCAT_labelmap"
-        )
+        pcatLabelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode","PCAT_labelmap")
         # export
         slicer.modules.segmentations.logic().ExportAllSegmentsToLabelmapNode(
             PCAT_seg,
             pcatLabelNode
         )
        
-        #  中身チェック
+        # Contents check
         imageData = pcatLabelNode.GetImageData()
         if imageData is None or imageData.GetPointData().GetScalars() is None:
             raise RuntimeError("PCAT labelmap is empty")
@@ -1387,16 +1241,17 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             pcatarteryLabelNode
         )
        
-        #  中身チェック
+        #  Contents check
         imageData2 = pcatarteryLabelNode.GetImageData()
         if imageData2 is None or imageData2.GetPointData().GetScalars() is None:
             raise RuntimeError("PCAT artry labelmap is empty")
        
        
-        # ---- save ----
-        ok = slicer.util.saveNode(pcatarteryLabelNode, os.path.join(self.save_dir,f"06_artery_analysis_range_{self.coronary_artery_name}.nii.gz"))
+        #save ----
+        ok = slicer.util.saveNode(pcatarteryLabelNode, os.path.join(self.save_dir,
+                                                                    f"06_artery_analysis_range_{self.coronary_artery_name}.nii.gz"))
         
-        
+        # for cleanup
         self.caseNodeIDs.append(pcatLabelNode.GetID())
         self.caseNodeIDs.append(pcatarteryLabelNode.GetID())
         self.clearCaseNodes(caseNodeIDs=self.caseNodeIDs)
@@ -1424,31 +1279,32 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
         
     def hu_to_color(self, hu):
         """
-        HU を -190〜-30 の範囲で 0〜1 に正規化し、
-        その値で #00f5d4（低）〜 #fee440（高）を線形補間する。
+        HU is normalized to 0 to 1 in the range of -190 to -30,
+        and linearly interpolated between #00f5d4 (low) and #fee440 (high) using that value.
         """
 
-        # 1) HU を 0〜1 に正規化
+        # Normalize HU to 0 to 1
         hu_min = -190.0
         hu_max = -30.0
         t = (hu - hu_min) / (hu_max - hu_min)
         t = np.clip(t, 0.0, 1.0)
 
-        # 2) 色の定義（RGB 0〜255）
-        c_low = np.array([0x4c, 0xd9, 0x64], dtype=float) # #4cd964（グリーン）
-        c_high = np.array([0xf3, 0x42, 0x13], dtype=float) # #f34213（オレンジレッド）
+        # color（RGB 0〜255）
+        c_low = np.array([0x4c, 0xd9, 0x64], dtype=float) # #4cd964（green）
+        c_high = np.array([0xf3, 0x42, 0x13], dtype=float) # #f34213（orangered）
 
-        # 3) 線形補間
+        #  linear interpolation
         rgb = (1 - t) * c_low + t * c_high
         return rgb.astype(np.uint8)
     
         
     def createColorizedOriginal(self, volumeNode, segmentationNode, pcatSegID):
         
-        # --- 1) Original CT を取得 ---
+        # get Original CT 
+        
         ct = slicer.util.arrayFromVolume(volumeNode)
 
-        # ---  Window / Level を適用（Window=800, Level=250） ---
+        # Window / Level （Window=800, Level=250）
         window = 800.0
         level = 250.0
 
@@ -1458,10 +1314,9 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
         ct_wl = (ct - minHU) / (maxHU - minHU)
         ct_norm = np.clip(ct_wl * 255.0, 0, 255).astype(np.uint8)
 
-        # --- 2) PCAT mask を取得 ---
+        #get  PCAT mask
         labelmapNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
-        #  Export 後に中身があるかチェック
-        
+    
         ids = vtk.vtkStringArray()
         ids.InsertNextValue(pcatSegID)
 
@@ -1472,20 +1327,20 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
                     raise RuntimeError("Labelmap export failed: no image data created") 
         mask = slicer.util.arrayFromVolume(labelmapNode).astype(bool)
 
-        # --- 3) HU 値を取得 ---
+        # get HU 
         hu = slicer.util.arrayFromVolume(volumeNode)
 
-        # --- 4) RGBA 画像を作成 ---
+        # createRGBAimages
         h, w, d = ct.shape
         rgba = np.zeros((h, w, d, 4), dtype=np.uint8)
 
-        # Window/Level 適用済み CT を RGB に変換
+        #  CT2RGB
         rgba[..., 0] = ct_norm
         rgba[..., 1] = ct_norm
         rgba[..., 2] = ct_norm
         rgba[..., 3] = 255
 
-        # --- 5) PCAT 部分だけ hu_to_color() で色付け ---
+        # hu_to_color() only pcat area
         hu_vals = hu[mask]
         colors = np.array([self.hu_to_color(v) for v in hu_vals])
 
@@ -1493,7 +1348,7 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
         rgba[mask, 1] = colors[:, 1]  # G
         rgba[mask, 2] = colors[:, 2]  # B
 
-        # --- 6) VectorVolume として保存可能にする ---
+        #VectorVolume save
         outNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLVectorVolumeNode")
         slicer.util.updateVolumeFromArray(outNode, rgba)
         outNode.CopyOrientation(volumeNode)
@@ -1511,7 +1366,6 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
         ref = np.array(ref)
         return min(points, key=lambda p: np.linalg.norm(np.array(p) - ref))  
     def sanitize_filename(self,name):
-        # Windowsで禁止されている文字を _ に置換
         return re.sub(r'[\\/:*?"<>|]', '_', name)
     
     def rasToIjkPoints(self,volumeNode, rasPoints):
@@ -1568,7 +1422,7 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
         effect.self().onApply()
         slicer.app.processEvents()
     
-        # クリーンアップ
+        # cleanup
         segmentEditorWidget = None
         slicer.mrmlScene.RemoveNode(segmentEditorNode)
        
@@ -1590,10 +1444,9 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
         effect.self().onApply()
         slicer.app.processEvents()
     
-        # クリーンアップ
+        # cleanup
         segmentEditorWidget = None
         slicer.mrmlScene.RemoveNode(segmentEditorNode)
-        #self.registerCaseNode(segmentEditorNode)
         
     def find_first_bifurcation(self, mergedCenterlines, coord_mm, tol):
         """
@@ -1605,7 +1458,7 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
     
         start_points = np.array(start_points)
     
-        # 互いに近い start point をクラスタ化
+        # start point
         groups = []
         used = set()
     
@@ -1617,7 +1470,8 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
                 if np.linalg.norm(start_points[i] - start_points[j]) < tol:
                     group.append(j)
             if len(group) >= 2:
-                return group  # 最初に見つかった分岐
+                # first bifurcation
+                return group  
             used.update(group)
     
         return []
@@ -1625,7 +1479,7 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
     def classify_LAD_LCX(self, branch_ids,coord_mm):
     
         """
-        LM 分岐直後の branch ID から LAD / LCX を判定（改良版）
+        Determine LAD/LCX from branch ID immediately after LM bifurcation 
         """
         scores = {}
          
@@ -1636,26 +1490,28 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
             v = pts[n] - pts[0]
             v = v / np.linalg.norm(v)
          
-            # 成分
             vx, vy, vz = v
          
-            # LAD: 下向き（Z-）が強い
+            # LAD: Assuming that the downward direction (Z-) is strong
             lad_score = -vz
          
-            # LCX: Zが小さく、XY平面に沿う + 後壁方向
+            # LCX: Assuming  Z is small, along the XY plane + back wall direction
             lcx_score = (1 - abs(vz)) + abs(vy)
          
             scores[bid] = (lad_score, lcx_score)
          
         lad_id = max(scores, key=lambda k: scores[k][0])
          
-        # LAD 以外から LCX を選ぶ
+        # Selecting LCX from other than LAD
         lcx_candidates = {k: v for k, v in scores.items() if k != lad_id}
         lcx_id = max(lcx_candidates, key=lambda k: lcx_candidates[k][1])
          
         return lad_id, lcx_id
-    #LAD,LCXの場合にbifurcationを探してある程度自動で番号をふる
+    
     def collect_until_length(self, start_id,coord_mm, mergedCenterlines,target_len=40.0, angle_th=np.deg2rad(30)):
+        """
+        In the case of LAD and LCX, search for bifurcation and assign numbers automatically to some extent
+        """
         collected = [start_id]
         cum_len = 0.0
     
@@ -1671,7 +1527,7 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
             v = pts[min(10, len(pts)-1)] - pts[0]
             v /= np.linalg.norm(v)
     
-            # 方向が近いものだけ継続
+            # Continue only those with similar directions
             if np.arccos(np.clip(np.dot(v_prev, v), -1, 1)) < angle_th:
                 collected.append(i)
                 diffs = np.diff(pts, axis=0)
@@ -1682,19 +1538,4 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
                 break
     
         return collected
-    """
-    def setCaseNodeCollector(self, caseNodeIDs):
-        if hasattr(self, "_caseNodeIDs"):
-            return
-        self._caseNodeIDs = caseNodeIDs  
-        
-    def registerCaseNode(self, node):
-        if not node:
-            return
-        nid = node.GetID()
-        if nid not in self._caseNodeIDs:
-            self._caseNodeIDs.append(nid)
-        print("logic sees:", self._caseNodeIDs)
-        print("Logic self id :", id(self))
-        print("Logic list id :", id(self._caseNodeIDs))
-    """
+ 

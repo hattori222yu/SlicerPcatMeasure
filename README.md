@@ -36,18 +36,16 @@ based on coronary centerlines.
 
 Supported version
 
-3D Slicer 5.x (tested with 5.0.2)
+3D Slicer 5.x (tested with 5.0.2)- The version in which slicerVMTK is installed correctly.
 ## Usage
 
 ### CoronaryCenterlineCrossSection
 
-If a coronary artery segmentation is not available, this module allows you to
-create a vessel segmentation for the target analysis region.
+If you do not have a coronary artery segmentation, you can use this module to create a vessel segmentation for the analysis region of interest.
 
 1. In step [1], select a coronary CT angiography image.
 
-2. Manually create a simplified centerline for the coronary branch to be analyzed,
-   and select it in step [2].
+2. Manually create a simple centerline of the coronary artery branch to be analyzed using the Markups > Curve.Note that the start point of the analysis range will be the start point of this curve.Once created, select [2].
 
 3. If necessary, adjust the following parameters before proceeding:
    - **Step along centerline**:  
@@ -55,13 +53,13 @@ create a vessel segmentation for the target analysis region.
      A cross-sectional segmentation is generated at each centerline point.
    - **Circle resample points**:  
      The number of points used to generate a closed circular contour
-     representing the vessel cross-section (default is 6 points).
+     representing the vessel cross-section (default is 64 points).
    - **Smoothing kernel size**:  
-     (Currently not defined.)
+     Controls the strength of morphological smoothing applied to the segmentation. Larger values produce smoother boundaries but may remove fine details.
    - **Lumen kernel size**:  
-     Since the initial coronary segmentation is generated using a simple
-     threshold-based method, this parameter controls the scaling factor
-     applied to estimate the lumen size.
+     Coefficient of how large a circle to make from the initial simple threshold-based coronary artery segmentation (default is 1.5).
+   - **threshold**:  
+     This is a simple initial segmentation of the coronary arteries. It is a simple thresholding process. Please adjust it if the image is poor.
 
 4. Click **Apply** in step [3] to generate cross-sectional views of the coronary
    artery along the centerline.  
@@ -82,15 +80,18 @@ create a vessel segmentation for the target analysis region.
 ### PcatMeasure
 
 This module requires a contrast-enhanced coronary CT image and a segmentation
-of the coronary artery to be analyzed.  
+of the coronary artery to be analyzed. 
+ 
+PCAT attenuation was calculated as the mean CT value within the range of **–190 HU to –30 HU** over an area outside three times the vessel radius.
+
 For easier analysis, it is recommended that the coronary artery segmentation
 is separated into left and right coronary arteries.
 
-PCAT attenuation is calculated as the mean CT value within the range
-from **–190 HU to –30 HU**.
+If you have coronary artery segmentation obtained by deep learning, etc., you can measure PCAT using only this module. In that case, please use the "Manual starting point" button in the options to set the origin of the coronary artery on the coronary CT image or the starting point of the analysis.
+
 
 1. Select the data source using the checkbox.  
-   By default, data are loaded from the current Scene.  
+   By default, data are loaded from the current Scene. 
    If unchecked, a file dialog will open to load data from disk.
 
 2. Select the coronary branch to be analyzed.
@@ -101,10 +102,10 @@ from **–190 HU to –30 HU**.
 
 4. Click **[1] Get CT Node**.
 
-5. Use the slider to define the range for PCAT measurement.  
+5. If necessary, use the slider to define the range of the PCAT measurement.
    Default ranges are:
-   - **RCA**: 10.0–50.0 mm from the ostium  
-   - **LAD / LCX**: 0.0–40.0 mm from the ostium
+   - **RCA**: 10.0–50.0 mm  
+   - **LAD / LCX**: 0.0–40.0 mm
 
 6. Click **[2] Select branches** to extract a high-precision coronary centerline.  
    The checked branch will be used for analysis.  
@@ -124,6 +125,9 @@ from **–190 HU to –30 HU**.
 
 - **Reset slicer views**  
   Restores reformatted slice views to their original state.
+
+- **Manual starting point**  
+  On the coronary CT image, set the origin of the coronary artery or the starting point to be analyzed.
 
 - **Clear All**  
   Removes all data from the Scene.
@@ -156,18 +160,17 @@ clinical use.
 
 ## Authors
 
-- Masayuki Hattori, Yamagata University, Japan
-- Daisuke Kinoshita, Yamagata University, Japan
+- Masayuki Hattori, Yamagata University Hospital, Japan
+- Daisuke Kinoshita, Yamagata University Hospital, Japan
 
 
 ## Citation
 
-If you use this extension in your research, please cite:
+If you use this extension in academic work, we would appreciate citation of the following manuscript, which is currently under review:
 
->Hattori M, et al.  
->Development of a PCAT measurement tool integrating deep learning-based
->segmentation and centerline analysis.  
->(Manuscript in preparation)
+Hattori M, et al.
+Development and validation of a pericoronary adipose tissue attenuation analysis system.
+Manuscript under review.
 
 Also please cite the 3D Slicer platform and the Vascular Modeling Toolkit (VMTK).
 
