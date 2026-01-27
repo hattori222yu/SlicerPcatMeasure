@@ -90,17 +90,21 @@ is separated into left and right coronary arteries.
 If you have coronary artery segmentation obtained by deep learning, etc., you can measure PCAT using only this module. In that case, please use the "Manual starting point" button in the options to set the origin of the coronary artery on the coronary CT image or the starting point of the analysis.
 
 
-1. **Load data from** Select the data source using the checkbox.  
+1. **Load data from** 
+   Select the data source using the checkbox.  
    By default, data are loaded from the current Scene. 
    If unchecked, a file dialog will open to load data from disk.
 
-2. **Segment data** Please select whether the segmentation data you are analyzing has branches.
+2. **Segment data** 
+   Please select whether the segmentation data you are analyzing has branches.
    If it comes from the CoronaryCenterlineCrossSection module, Single is OK. 
    If you have branched segmentation, please select Branched.
 
-3. **Target coronary artery** Select the coronary branch to be analyzed.
+3. **Target coronary artery** 
+   Select the coronary branch to be analyzed.
 
-4. **Select CT Volume** and **Select Segmentation** Select the CT volume and the coronary artery segmentation.  
+4. **Select CT Volume** and **Select Segmentation** 
+   Select the CT volume and the coronary artery segmentation.  
    If this module is opened using the **Go to PCAT** button from
    *CoronaryCenterlineCrossSection*, these fields are automatically populated.
 
