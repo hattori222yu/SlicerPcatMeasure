@@ -121,14 +121,24 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         #self.clearButton3 = qt.QPushButton("Clear (except CT and Seg)")
         self.resetViewButton = qt.QPushButton("Reset slice views")
         self.backButton = qt.QPushButton("Back to Coronary Centerline Cross Section")
-        self.showInflammationButton = qt.QPushButton("[4] : Show PCAT inflammation")
+        self.showInflammationButton = qt.QPushButton("Show PCAT inflammation")
 
         #checkbox
         self.saveOverlayCheckBox = qt.QCheckBox("Save Overlay Images")
         self.saveOverlayCheckBox.checked = False
-        self.loadCheckBox = qt.QCheckBox("Scene(True) or dialog(False)")
-        self.loadCheckBox.checked = True
-                
+        
+        #self.loadCheckBox = qt.QCheckBox("Scene(True) or dialog(False)")
+        #self.loadCheckBox.checked = True
+        self.sceneRadioButton = qt.QRadioButton("Scene")
+        self.dialogRadioButton = qt.QRadioButton("Dialog") 
+        # Default
+        self.sceneRadioButton.checked = True
+        
+        self.singleRadio = qt.QRadioButton("Single vessel (no branch)")
+        self.branchRadio = qt.QRadioButton("Branch vessel")
+        self.singleRadio.checked = True
+        
+        
         #CT Volume selector 
         ctLabel = qt.QLabel("Select CT Volume (from Scene)")
         ctLabel.setStyleSheet("font-weight: bold;")
@@ -200,12 +210,31 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         label = qt.QLabel("Load data from:")
         label.setStyleSheet("font-weight: bold;")
-        formLayout.addRow(label, self.loadCheckBox)
+        #formLayout.addRow(label, self.loadCheckBox)
+        self.loadButtonGroup = qt.QButtonGroup()
+        self.loadButtonGroup.addButton(self.sceneRadioButton)
+        self.loadButtonGroup.addButton(self.dialogRadioButton)
+        radioLayout = qt.QHBoxLayout()
+        radioLayout.addWidget(self.sceneRadioButton)
+        radioLayout.addWidget(self.dialogRadioButton)
+        radioLayout.addStretch(1)
+        formLayout.addRow(label, radioLayout)
+        
+        label = qt.QLabel("Segment data:")
+        label.setStyleSheet("font-weight: bold;")
+        self.branchTypeGroup = qt.QButtonGroup()
+        self.branchTypeGroup.addButton(self.singleRadio)
+        self.branchTypeGroup.addButton(self.branchRadio)
+        radioLayout = qt.QHBoxLayout()
+        radioLayout.addWidget(self.singleRadio)
+        radioLayout.addWidget(self.branchRadio)
+        radioLayout.addStretch(1)
+        formLayout.addRow(label, radioLayout)
         
         # --- Target coronary artery (GroupBox) ---
         arteryWidget = qt.QWidget()
         arteryLayout = qt.QHBoxLayout(arteryWidget)
-        arteryLayout.setContentsMargins(0, 0, 0, 0)
+        arteryLayout.setContentsMargins(0, 0, 0, 8)
         arteryLayout.setSpacing(12)
         arteryLayout.addWidget(self.rcaRadio)
         arteryLayout.addWidget(self.ladRadio)
@@ -234,8 +263,8 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         pcatTitle.setStyleSheet("font-weight: bold;")
         formLayout.addRow(pcatTitle, qt.QWidget())  
         
-        formLayout.addRow("Start (mm)", self.startSlider)
-        formLayout.addRow("End (mm)", self.endSlider)
+        formLayout.addRow("                Start (mm)", self.startSlider)
+        formLayout.addRow("                  End (mm)", self.endSlider)
         
         label = qt.QLabel("")
         label.setStyleSheet("font-weight: bold;")
@@ -252,16 +281,8 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
      
         label = qt.QLabel("")
         label.setStyleSheet("font-weight: bold;")
-        formLayout.addRow(label, self.resetViewButton)
-        label = qt.QLabel("")
-        label.setStyleSheet("font-weight: bold;")
         formLayout.addRow(label, self.addPointButton)
-        label = qt.QLabel("")
-        label.setStyleSheet("font-weight: bold;")
-        
-        label = qt.QLabel("")
-        label.setStyleSheet("font-weight: bold;")
-        
+        formLayout.addRow(label, self.resetViewButton)
         formLayout.addRow(label, self.clearButton)
         formLayout.addRow(label, self.clearButton2)
         formLayout.addRow(label, self.backButton)
@@ -343,7 +364,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
 #%%%    signals
     #[1] : Get CT Node button scene or dialog   
     def onLoadCT(self):
-        if self.loadCheckBox.checked:
+        if self.sceneRadioButton.checked:
             self.ctNode = self.ctSelector.currentNode()
             if self.ctNode is None:
                 slicer.util.errorDisplay("No CT Volume selected.")
@@ -527,7 +548,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
 #%% selectbranch button
     def onSelect_branches(self):
         logging.info("step0:Analysis target = %s", self.coronary_artery_name)
-        if self.loadCheckBox.checked==False:
+        if self.dialogRadioButton.checked:
             
         
             filePath = qt.QFileDialog.getOpenFileName(
@@ -593,7 +614,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         # Step1: Load Segmentation: From Path to 'vtkMRMLSegmentationNode' type        
         logging.info("step1:Load Segmentation")
       
-        if self.loadCheckBox.checked:
+        if self.sceneRadioButton.checked:
             self.segmentationNode = self.segmentSelector.currentNode()
             if self.segmentationNode is None:
                 slicer.util.errorDisplay("Segmentation no selected")
@@ -652,7 +673,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         markupsNode = slicer.mrmlScene.GetFirstNodeByName("PickedPoints")
         paramNode = slicer.mrmlScene.GetFirstNodeByName("PCATParameters")
         if paramNode:
-            logging.info("--paramNode")
+            #logging.info("--paramNode")
     
             s = paramNode.GetParameter("CenterlineStartPointRAS")
             if not s:
@@ -660,7 +681,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             startPointPosition = np.array([float(v) for v in s.split(",")])
             
         elif markupsNode and markupsNode.GetNumberOfControlPoints() > 0:
-            logging.info("--markupsNode")
+            #logging.info("--markupsNode")
             n = markupsNode.GetNumberOfControlPoints()
             for i in range(n):
                 ras = [0.0, 0.0, 0.0]
@@ -918,15 +939,21 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         if displayNode:
             displayNode.SetVisibility3D(False)
         
-        #chexk branch ids
-        showMultiCheckPopup(
-            total_lengths,
-            default_ids=self.default_branch_id,
-            coronary_name=self.coronary_artery_name,
-            onAcceptedCallback=self.BranchSelectionAccepted
-        )
         
-        
+        if self.singleRadio.checked:
+            total_selected_length = sum(total_lengths[i] for i in self.default_branch_id)
+            self.BranchSelectionAccepted(self.default_branch_id, total_selected_length)
+
+        else:
+            #chexk branch ids
+            showMultiCheckPopup(
+                total_lengths,
+                default_ids=self.default_branch_id,
+                coronary_name=self.coronary_artery_name,
+                onAcceptedCallback=self.BranchSelectionAccepted
+            )
+            
+            
 #%% analysys pcat
     def onAnalysys_pcat(self):
         

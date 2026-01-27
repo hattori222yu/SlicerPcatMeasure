@@ -8,7 +8,7 @@ import vtk
 from vtk.util import numpy_support
 import numpy as np
 def create_curved_cylinder_mask(branch_coords, branch_radius):
-    # ポリライン作成
+    
 
     points = vtk.vtkPoints()
     lines = vtk.vtkCellArray()
@@ -26,7 +26,7 @@ def create_curved_cylinder_mask(branch_coords, branch_radius):
     polyData.SetPoints(points)
     polyData.SetLines(lines)
 
-    # 各点の半径をvtkArrayに変換
+    
     radius_array = numpy_support.numpy_to_vtk(branch_radius.astype(np.float32), deep=True)
     radius_array.SetName("TubeRadius")
     polyData.GetPointData().AddArray(radius_array)
@@ -34,12 +34,12 @@ def create_curved_cylinder_mask(branch_coords, branch_radius):
                          
     
                          
-    # TubeFilterでチューブ生成（変動半径対応）
+    
     tubeFilter = vtk.vtkTubeFilter()
     tubeFilter.SetInputData(polyData)
     tubeFilter.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
-    tubeFilter.SetNumberOfSides(20)  # 円の分割数
-    tubeFilter.CappingOn()  # 🔴 チューブの端を閉じる
+    tubeFilter.SetNumberOfSides(20)  
+    tubeFilter.CappingOn() 
     tubeFilter.Update()
     
                          

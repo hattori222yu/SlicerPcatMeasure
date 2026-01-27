@@ -14,13 +14,13 @@ import os
 
 
 def exportSegToLabel(segNode, referenceVolumeNode):
-    # 空の LabelMap を CT と同じジオメトリで作成
+    
     labelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
 
-    # セグメンテーション → ラベルマップ
+   
     slicer.modules.segmentations.logic().ExportSegmentsToLabelmapNode(
         segNode,
-        ["seg_artery_PCAT"],  # 可視 Segment だけでもOK
+        ["seg_artery_PCAT"],  
         labelNode,
         referenceVolumeNode
     )
@@ -29,7 +29,7 @@ def exportSegToLabel(segNode, referenceVolumeNode):
 def saveOverlayImage(ctNode, labelNode, outputDir):
     os.makedirs(outputDir, exist_ok=True)
 
-    # NumPy 配列取得（z, y, x）
+    # NumPy （z, y, x）
     ct_img = slicer.util.arrayFromVolume(ctNode)
     mask_img = slicer.util.arrayFromVolume(labelNode)
 
@@ -63,7 +63,7 @@ def saveOverlayImage(ctNode, labelNode, outputDir):
                 ct_vtk.SetScalarComponentFromFloat(x, y, 0, 2, v)
 
         # -----------------------------
-        # Mask slice → vtkImageData（赤）
+        # Mask slice → vtkImageData
         # -----------------------------
         mask_vtk = vtk.vtkImageData()
         mask_vtk.SetDimensions(mask_slice.shape[1], mask_slice.shape[0], 1)

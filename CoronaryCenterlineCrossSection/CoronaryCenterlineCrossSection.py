@@ -236,7 +236,7 @@ class CoronaryCenterlineCrossSectionWidget(ScriptedLoadableModuleWidget, VTKObse
         # ex) Reset once when threshold etc. is changed and self.prevIndex
         self.prevIndex=None
         self.logic.resetSliceCircles()
-        print("self.prevIndex",self.prevIndex)
+        #print("self.prevIndex",self.prevIndex)
         # Lag ON
         self.segmentationReady = True
         # Initialize slider
@@ -245,7 +245,7 @@ class CoronaryCenterlineCrossSectionWidget(ScriptedLoadableModuleWidget, VTKObse
         self.slider.blockSignals(False)
         # Explicitly update the first slice
         self.logic.updateSlice(0, self.segNode, "Vessel",self.radiusScaleSlider.value)
-        slicer.util.infoDisplay(f"Segmented vessel created: {self.segNode.GetName()}")
+        #slicer.util.infoDisplay(f"Segmented vessel created: {self.segNode.GetName()}")
         self.setupSegmentationDisplay(self.segNode)
         self.enableWheelControl()   
         
@@ -267,7 +267,10 @@ class CoronaryCenterlineCrossSectionWidget(ScriptedLoadableModuleWidget, VTKObse
             kernelSizeMm=kernelSizeMm
         )
         
-        
+        layoutManager = slicer.app.layoutManager()
+        threeDWidget = layoutManager.threeDWidget(0)
+        threeDView = threeDWidget.threeDView()
+        threeDView.resetFocalPoint()
         #Closed circle 
         #print("=== sliceCircles dump ===")
         #for idx, circle in self.logic.sliceCircles.items():

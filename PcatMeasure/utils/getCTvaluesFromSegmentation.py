@@ -10,7 +10,7 @@ import csv
 import numpy as np
 import os
 def appendMeanToCSV(csvPath, filename, arteryname, meanValue,i,j,k):
-    # フォルダがなければ作成
+    
     os.makedirs(os.path.dirname(csvPath), exist_ok=True)
 
     fileExists = os.path.exists(csvPath)
@@ -18,14 +18,14 @@ def appendMeanToCSV(csvPath, filename, arteryname, meanValue,i,j,k):
     with open(csvPath, mode="a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
-        # ヘッダ（初回のみ）
+        
         if not fileExists:
             writer.writerow(["filename", "artery", "mean_CT_value","I","J","K"])
 
         writer.writerow([filename, arteryname, f"{meanValue:.3f}",i,j,k])
 
 def getCTvaluesFromSegmentation(segNode, volumeNode,filename,arteryname,save_dir,branch_start_corrdinate):
-    # --- 1. LabelMap へ変換 ---
+    # --- 1. to LabelMap ---
     #referenceGeometry = slicer.modules.segmentations.logic().GetVolumeNodeGeometry(self.ctNode)
 
     labelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
@@ -39,22 +39,22 @@ def getCTvaluesFromSegmentation(segNode, volumeNode,filename,arteryname,save_dir
     # --- 3. CT Volume → NumPy array ---
     ctArray = slicer.util.arrayFromVolume(volumeNode)
     #print("ctArray.shape",ctArray.shape)
-    # --- 4. セグメントが存在する部分（label==1）を抽出 ---
+    # --- 4. extract label==1 ---
     mask = labelArray > 0
     ct_values = ctArray[mask]
 
-    # --- 5. labelNode を削除 ---
+    # --- 5. labelNode delete ---
     slicer.mrmlScene.RemoveNode(labelNode)
     
     
     hu_min = -190
     hu_max = -30
     
-    # ct_values はセグメント内ボクセルの HU 値が入った 1D numpy 配列
+    
     masked_values = ct_values[(ct_values >= hu_min) & (ct_values <= hu_max)]
     
     if masked_values.size == 0:
-        mean_hu = None   # 該当値がない場合
+        mean_hu = None   
     else:
         mean_hu = masked_values.mean()
     
