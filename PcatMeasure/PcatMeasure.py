@@ -134,8 +134,8 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         # Default
         self.sceneRadioButton.checked = True
         
-        self.singleRadio = qt.QRadioButton("Single vessel (no branch)")
-        self.branchRadio = qt.QRadioButton("Branch vessel")
+        self.singleRadio = qt.QRadioButton("Single")
+        self.branchRadio = qt.QRadioButton("Branched")
         self.singleRadio.checked = True
         
         
@@ -208,7 +208,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         formLayout.setHorizontalSpacing(8)
         formLayout.setVerticalSpacing(6)
         
-        label = qt.QLabel("Load data from:")
+        label = qt.QLabel("Load data from")
         label.setStyleSheet("font-weight: bold;")
         #formLayout.addRow(label, self.loadCheckBox)
         self.loadButtonGroup = qt.QButtonGroup()
@@ -220,7 +220,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         radioLayout.addStretch(1)
         formLayout.addRow(label, radioLayout)
         
-        label = qt.QLabel("Segment data:")
+        label = qt.QLabel("Segment data")
         label.setStyleSheet("font-weight: bold;")
         self.branchTypeGroup = qt.QButtonGroup()
         self.branchTypeGroup.addButton(self.singleRadio)
