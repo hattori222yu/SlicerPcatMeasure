@@ -132,7 +132,7 @@ If you have coronary artery segmentation obtained by deep learning, etc., you ca
   Generates a color-mapped visualization of the PCAT region.
 
 - **Manual starting point**  
-  On the coronary CT image, set the origin of the coronary artery or the starting point to be analyzed.s
+  On the coronary CT image, set the origin of the coronary artery or the starting point to be analyzed.
 
 - **Reset slicer views**  
   Restores reformatted slice views to their original state.
