@@ -24,8 +24,13 @@ import re
 import pickle
 import numpy as np
 import logging
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 
+_thisDir = os.path.dirname(os.path.abspath(__file__))
+_utilsDir = os.path.join(_thisDir, "utils")
+
+if _utilsDir not in sys.path:
+    sys.path.insert(0, _utilsDir)
 import qt
 import ctk
 import vtk
@@ -36,14 +41,14 @@ import vtk.util.numpy_support
 import slicer
 from slicer.ScriptedLoadableModule import *
 
-from utils.branch import showMultiCheckPopup
-from utils.cal_startpoint import cal_start_point
-from utils.save_overlay import exportSegToLabel
-from utils.save_overlay import saveOverlayImage
-from utils.save_poly import save_poly
-from utils.create_curved_cylinder_mask import create_curved_cylinder_mask
-from utils.getCTvaluesFromSegmentation import getCTvaluesFromSegmentation
-from utils.extract_centerline_logic import ExtractCenterlineLogic
+from branch import showMultiCheckPopup
+from cal_startpoint import cal_start_point
+from save_overlay import exportSegToLabel
+from save_overlay import saveOverlayImage
+from save_poly import save_poly
+from create_curved_cylinder_mask import create_curved_cylinder_mask
+from getCTvaluesFromSegmentation import getCTvaluesFromSegmentation
+from extract_centerline_logic import ExtractCenterlineLogic
 logging.getLogger().setLevel(logging.DEBUG)
 
 #
@@ -250,6 +255,19 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         label = qt.QLabel("")
         label.setStyleSheet("font-weight: bold;")
         formLayout.addRow(label, self.analysypcatButton)
+        formLayout.addItem(qt.QSpacerItem(0, 8, qt.QSizePolicy.Minimum, qt.QSizePolicy.Fixed))
+        
+        self.pcatTitleLabel = qt.QLabel("PCAT HU:")
+        self.pcatTitleLabel.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.pcatValueLabel = qt.QLabel("")
+        self.pcatValueLabel.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.pcatValueLabel.setTextInteractionFlags(qt.Qt.TextSelectableByMouse)
+        self.pcatValueLabel.setFrameStyle(qt.QFrame.Panel | qt.QFrame.Sunken)
+        self.pcatValueLabel.setLineWidth(1)
+        self.pcatValueLabel.setAlignment(qt.Qt.AlignRight | qt.Qt.AlignVCenter)
+        #self.pcatValueLabel.setMaximumWidth(120)
+        formLayout.addRow(self.pcatTitleLabel, self.pcatValueLabel)
+        
         formLayout.addItem(qt.QSpacerItem(0, 16, qt.QSizePolicy.Minimum, qt.QSizePolicy.Fixed))
         
         label = qt.QLabel("Option")
@@ -352,7 +370,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                 
                 self.ct_file_path = None
                 self.ct_file_name = self.ctNode.GetName()
-            logging.info("--Loaded CT")
+            print("--Loaded CT")
         else:
             filePath = qt.QFileDialog.getOpenFileName(
             None,
@@ -384,7 +402,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             self.caseNodeIDs.append(self.ctNode.GetID())
             self.keepIDs.append(self.ctNode.GetID())
 
-            logging.info("--Loaded CT")
+            print("--Loaded CT")
                
     
 #%%   radio button
@@ -461,11 +479,11 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
 #%% Clear node
     def onClearAllNodes(self):
         slicer.mrmlScene.Clear(0)
-        logging.info("All displayable nodes cleared.")
+        print("All displayable nodes cleared.")
         
     def onClearNodes_except_CT(self):
         self.clearCaseNodes(caseNodeIDs=self.caseNodeIDs_2,keepNodeIDs=self.keepIDs)
-        logging.info("All nodes except the CT have been cleared.")    
+        print("All nodes except the CT have been cleared.")    
 
 #%% inflammatino2jpeg
     def onShowInflammation(self):
@@ -512,12 +530,12 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         self.selected_ids = selected_ids
         self.total_selected_length = total_selected_length
 
-        logging.info("--Selected branch IDs: %s", self.selected_ids)
-        logging.info("--Total length: %s", self.total_selected_length)
+        print("--Selected branch IDs:", self.selected_ids)
+        print("--Total length:", self.total_selected_length)
     
 #%% selectbranch button
     def onSelect_branches(self):
-        logging.info("step0:Analysis target = %s", self.coronary_artery_name)
+        print("step0:Analysis target =", self.coronary_artery_name)
         if self.dialogRadioButton.checked:
             
         
@@ -582,7 +600,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         #centerlineCurveNode.GetDisplayNode().SetVisibility(False)
 
         # Step1: Load Segmentation: From Path to 'vtkMRMLSegmentationNode' type        
-        logging.info("step1:Load Segmentation")
+        print("step1:Load Segmentation")
       
         if self.sceneRadioButton.checked:
             self.segmentationNode = self.segmentSelector.currentNode()
@@ -608,7 +626,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                 segmentID = segmentation.GetNthSegmentID(0)
 
         # Step2: SegmentationNode to vtkPolyData
-        logging.info("step2:SegmentationNode to vtkPolyData")
+        print("step2:SegmentationNode to vtkPolyData")
         inputSurfacePolyData = self.extractLogic.polyDataFromNode(self.segmentationNode, segmentID)
         SAVE_VTK=True
         save_poly(SAVE_VTK, inputSurfacePolyData, os.path.join(self.save_dir, f"01_inputSurfacePolyData_{self.coronary_artery_name}.vtk"))
@@ -624,7 +642,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         save_poly(SAVE_VTK, preprocessedPolyData, os.path.join(self.save_dir, f"02_preprocessedPolyData_{self.coronary_artery_name}.vtk"))
         
         # Step3: Extract Centerline Network (Approximated Centerline)
-        logging.info("step3:Extract Centerline Network")
+        print("step3:Extract Centerline Network")
         endPointsMarkupsNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode", endpointName)
         endPointsMarkupsNode.GetDisplayNode().SetVisibility(False)
         networkPolyData = self.extractLogic.extractNetwork(preprocessedPolyData, endPointsMarkupsNode, computeGeometry=True)  # Voronoi 
@@ -634,7 +652,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         self.caseNodeIDs.append(endPointsMarkupsNode.GetID())
 
         # Step4: Get EndPoints ( AutoDetect )
-        logging.info("step4:Get EndPoints")
+        print("step4:Get EndPoints")
         #startPointPosition=None
         
         startPointPosition_list = []
@@ -643,7 +661,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         markupsNode = slicer.mrmlScene.GetFirstNodeByName("PickedPoints")
         paramNode = slicer.mrmlScene.GetFirstNodeByName("PCATParameters")
         if paramNode:
-            #logging.info("--paramNode")
+            #print("--paramNode")
     
             s = paramNode.GetParameter("CenterlineStartPointRAS")
             if not s:
@@ -651,7 +669,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             startPointPosition = np.array([float(v) for v in s.split(",")])
             
         elif markupsNode and markupsNode.GetNumberOfControlPoints() > 0:
-            #logging.info("--markupsNode")
+            #print("--markupsNode")
             n = markupsNode.GetNumberOfControlPoints()
             for i in range(n):
                 ras = [0.0, 0.0, 0.0]
@@ -669,13 +687,13 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             endPointsMarkupsNode.AddControlPoint(vtk.vtkVector3d(position))
 
         # Step5: Extract Centerline, Voronoi
-        logging.info("step5:Get Extract Centerline, Voronoi")
+        print("step5:Get Extract Centerline, Voronoi")
         centerlinePolyData, voronoiDiagramPolyData = self.extractLogic.extractCenterline(preprocessedPolyData, endPointsMarkupsNode)
         centerlineModelNode.SetAndObserveMesh(centerlinePolyData)          
         voronoiModelNode.SetAndObserveMesh(voronoiDiagramPolyData)  
 
         # Step6: Extract centerlineCurves
-        logging.info("step6:Extract centerlineCurves")
+        print("step6:Extract centerlineCurves")
         self.mergedCenterlines, centerlineProperties, self.cell_pt = self.extractLogic.createCurveTreeFromCenterline(centerlinePolyData, centerlineCurveNode, centerlinePropertiesTableNode) 
         save_poly(SAVE_VTK, self.mergedCenterlines, os.path.join(self.save_dir,f"03_mergedCenterlines_{self.coronary_artery_name}.vtk"))
         
@@ -697,7 +715,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                 self.ce_ll_pt_LIST[cell].append(pt)
     
         # Step7: Extract centerlineCurve info
-        logging.info("step7:Extract and save centerlineCurve info")
+        print("step7:Extract and save centerlineCurve info")
         SAVE_INFO = True
         if(SAVE_INFO):
             r1 = self.mergedCenterlines.GetPointData().GetArray('Radius')
@@ -732,7 +750,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             with open(os.path.join(self.save_dir,f'00_centerCurve_coord_voxel_{self.coronary_artery_name}.pickle'), 'wb') as f:
                 pickle.dump(self.coord_voxel, f, pickle.HIGHEST_PROTOCOL)
 
-        logging.info("step8:Auto get branch IDs")
+        print("step8:Auto get branch IDs")
         groupIdsArrayName = 'GroupIds'
         groupIdsArray = self.mergedCenterlines.GetCellData().GetArray(groupIdsArrayName)
     
@@ -756,28 +774,12 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         
         if self.singleRadio.checked:
-            if self.coronary_artery_name == "RCA":
-                cumulative_length = 0
-                for i in range(len(total_lengths)):
-                    cumulative_length += total_lengths[i]
-                    self.default_branch_id.append(i)
-                    if cumulative_length >= 50:
-                        break
-            elif self.coronary_artery_name=="LAD":
+            #if self.coronary_artery_name == "RCA" or "LAD" or "LCX"
+            cumulative_length = 0
+            for i in range(len(total_lengths)):
+                cumulative_length += total_lengths[i]
+                self.default_branch_id.append(i)
                 
-                cumulative_length = 0
-                for i in range(len(total_lengths)):
-                    cumulative_length += total_lengths[i]
-                    self.default_branch_id.append(i)
-                    if cumulative_length >= 50:
-                        break
-            elif self.coronary_artery_name=="LCX":
-                cumulative_length = 0
-                for i in range(len(total_lengths)):
-                    cumulative_length += total_lengths[i]
-                    self.default_branch_id.append(i)
-                    if cumulative_length >= 50:
-                        break
         else:
             if len(total_lengths)>1:
             
@@ -860,7 +862,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                 cumulative_length += total_lengths[i]
                 self.default_branch_id.append(i)
         """                   
-        logging.info("--get branch ID is %s",self.default_branch_id)
+        print("--get branch ID is ",self.default_branch_id)
         
         
         """#manual marck up
@@ -879,7 +881,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             ras = [0.0, 0.0, 0.0]
             markupsNode.GetNthFiducialPosition(i, ras)
             self.coordinates.append(ras)
-            logging.info("Start point %d: R=%.2f, A=%.2f, S=%.2f",i + 1, ras[0], ras[1], ras[2])
+            print("Start point %d: R=%.2f, A=%.2f, S=%.2f",i + 1, ras[0], ras[1], ras[2])
     
         """
         
@@ -941,7 +943,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             
             self.textActors.append(text_actor)            
                        
-        logging.info("step9:check branch")
+        print("step9:check branch")
     
         self.total_selected_length = 0.0
                 
@@ -1061,7 +1063,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         writer.Write()
         
         #extract pcat 2
-        logging.info("step10:create artery & PCAT")
+        print("step10:create artery & PCAT")
         radius_data=self.radius_arr
         cell_id_data=self.cell_pt
         lists = [cell_id_data[bid] for bid in self.selected_ids]
@@ -1094,7 +1096,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         import inspect
         tube_polydata = create_curved_cylinder_mask(branch_0_coords_PCAT, branch_0_radius_PCAT*3.0)
         # Check that it is not 0
-        logging.info("--Tube Points(not zero): %s", tube_polydata.GetNumberOfPoints())  
+        print("--Tube Points(not zero):", tube_polydata.GetNumberOfPoints())  
         if tube_polydata.GetNumberOfPoints() == 0:
             raise ValueError("Tube Points zero")
              
@@ -1103,7 +1105,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         writer.SetInputData(tube_polydata)
         writer.Write()
                         
-        logging.info("step11:extract PCAT area")
+        print("step11:extract PCAT area")
         
         # tube_polydata is RAS corrdinate PolyData
         modelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
@@ -1111,11 +1113,13 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         modelNode.SetName("seg_artery_PCAT")
         
         segNode_artery_PCAT = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "Artery_seg")
+        segNode_artery_PCAT.CreateDefaultDisplayNodes()
         segNode_artery_PCAT.SetReferenceImageGeometryParameterFromVolumeNode(self.ctNode)
         slicer.modules.segmentations.logic().ImportModelToSegmentationNode(modelNode, segNode_artery_PCAT)         
         # Combine the two into a new SegmentationNode
         seg_artery=self.segmentationNode
         mergedSeg = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "MergedSeg")
+        mergedSeg.CreateDefaultDisplayNodes()
         mergedSeg.SetReferenceImageGeometryParameterFromVolumeNode(self.ctNode)
         
         logic = slicer.modules.segmentations.logic()
@@ -1150,6 +1154,8 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         self.logic.subtractSegment(workSeg_sub,self.ctNode,segmentIdB,segmentIdA)
         
         PCAT_seg = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "PCAT_seg")
+        PCAT_seg.CreateDefaultDisplayNodes()
+
         PCAT_seg.SetReferenceImageGeometryParameterFromVolumeNode(self.ctNode)
         
         labelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode", "tempLabel_sub")
@@ -1171,6 +1177,8 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         self.logic.intersectSegment(workSeg_int,self.ctNode,segmentIdB,segmentIdA)
         
         PCAT_artery_seg = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "PCAT_artery_seg")
+        PCAT_artery_seg.CreateDefaultDisplayNodes()
+
         PCAT_artery_seg.SetReferenceImageGeometryParameterFromVolumeNode(self.ctNode)
         
         labelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode", "tempLabel_int")
@@ -1202,7 +1210,12 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         
         segmentEditorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentEditorNode")
         segmentEditorNode.SetAndObserveSegmentationNode(self.PCAT_seg_filtered )
-        segmentEditorNode.SetAndObserveMasterVolumeNode(self.ctNode)
+        #segmentEditorNode.SetAndObserveMasterVolumeNode(self.ctNode)
+        if hasattr(segmentEditorNode, "SetAndObserveSourceVolumeNode"):
+            segmentEditorNode.SetAndObserveSourceVolumeNode(self.ctNode)
+        else:
+            segmentEditorNode.SetAndObserveMasterVolumeNode(self.ctNode)
+        
         
         segmentation = self.PCAT_seg_filtered .GetSegmentation()
         self.fat_segmentId = segmentation.GetNthSegmentID(0)
@@ -1246,11 +1259,11 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
         segmentdisp2 = segmentationdisp2.GetSegment(segmentIDdisp2)
         segmentdisp2.SetColor(0.0, 0.0, 1.0)
         
-        logging.info("step12:cal PCAT value")
+        print("step12:cal PCAT value")
         ct_values,PCAT_value_list,PCAT_value = getCTvaluesFromSegmentation(PCAT_seg, self.ctNode,self.ct_file_path,self.coronary_artery_name,self.save_dir_output,ijk_int)
         
-        logging.info("--PCAT HU: %s", PCAT_value)
-         
+        print("--PCAT HU:", PCAT_value)
+        self.pcatValueLabel.setText(f"{PCAT_value:.3f}")
         pcatLabelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode","PCAT_labelmap")
         # export
         slicer.modules.segmentations.logic().ExportAllSegmentsToLabelmapNode(
@@ -1299,7 +1312,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
             overlay_dir = os.path.join(self.save_dir, "overlay")
             os.makedirs(overlay_dir, exist_ok=True)
             
-            logging.info("now save overlay")
+            print("now save overlay")
             labelNode = exportSegToLabel(PCAT_seg, self.ctNode)
             
             saveOverlayImage(
@@ -1428,7 +1441,13 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
             "vtkMRMLSegmentEditorNode"
         )
         segmentEditorNode.SetAndObserveSegmentationNode(mergedSeg)
-        segmentEditorNode.SetAndObserveMasterVolumeNode(ctNode)
+        #segmentEditorNode.SetAndObserveMasterVolumeNode(ctNode)
+        if hasattr(segmentEditorNode, "SetAndObserveSourceVolumeNode"):
+            segmentEditorNode.SetAndObserveSourceVolumeNode(ctNode)
+        else:
+            segmentEditorNode.SetAndObserveMasterVolumeNode(ctNode)
+        
+    
     
         segmentEditorWidget = slicer.qMRMLSegmentEditorWidget()
         segmentEditorWidget.setMRMLScene(slicer.mrmlScene)
@@ -1440,6 +1459,7 @@ class PcatMeasureLogic(ScriptedLoadableModuleLogic):
         newSeg = slicer.mrmlScene.AddNewNodeByClass(
             "vtkMRMLSegmentationNode", newName
         )
+        newSeg.CreateDefaultDisplayNodes()
         newSeg.SetReferenceImageGeometryParameterFromVolumeNode(referenceVolume)
         newSeg.GetSegmentation().DeepCopy(sourceSeg.GetSegmentation())
         return newSeg

@@ -286,17 +286,17 @@ class CoronaryCenterlineCrossSectionWidget(ScriptedLoadableModuleWidget, VTKObse
         segmentation = segNode.GetSegmentation()
         segmentId = segmentation.GetNthSegmentID(0)
         segmentation.GetSegment(segmentId).SetColor(1.0, 1.0, 0.0) #yellow
-    
+        displayNode.SetOpacity2DFill(0.0)
         # Display settings
-        displayNode.SetVisibility(True)
-        displayNode.SetVisibility2DFill(False)
-        displayNode.SetVisibility3D(False)
+        displayNode.SetVisibility(False)
+        #displayNode.SetVisibility2DFill(False)
+        #displayNode.SetVisibility3D(False)
     
         # Outline　OFF
-        displayNode.SetVisibility2DOutline(False)
+        #displayNode.SetVisibility2DOutline(True)
     
         # Outline thickness
-        displayNode.SetSliceIntersectionThickness(1)
+        #displayNode.SetSliceIntersectionThickness(1)
         
         
     def onCTVolumeChanged(self, volumeNode):
@@ -331,7 +331,7 @@ class CoronaryCenterlineCrossSectionWidget(ScriptedLoadableModuleWidget, VTKObse
         # Get Widget 
         pcatWidget = slicer.modules.pcatmeasure.widgetRepresentation().self()
         if pcatWidget is None:
-            logging.info("PCAT module widget not found")
+            print("PCAT module widget not found")
             return
         pcatWidget.resetWidgetState()
 
@@ -562,7 +562,15 @@ class CoronaryCenterlineCrossSectionLogic(ScriptedLoadableModuleLogic):
             thresh.SetInputArrayToProcess(
                 0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, "RegionId"
             )
-            thresh.ThresholdBetween(rid, rid)
+            #thresh.ThresholdBetween(rid, rid)
+            if hasattr(thresh, "ThresholdBetween"):
+                # VTK <= 9.2
+                thresh.ThresholdBetween(rid, rid)
+            else:
+                # VTK >= 9.3
+                thresh.SetLowerThreshold(rid)
+                thresh.SetUpperThreshold(rid)
+                thresh.SetThresholdFunction(vtk.vtkThreshold.THRESHOLD_BETWEEN)
             thresh.Update()
     
             geom = vtk.vtkGeometryFilter()
@@ -1005,7 +1013,7 @@ class CoronaryCenterlineCrossSectionLogic(ScriptedLoadableModuleLogic):
         segmentation = segNode.GetSegmentation()
         segmentId = segmentation.GetNthSegmentID(0)
         if not segmentId:
-            logging.info("No segment found")
+            print("No segment found")
             return
     
         editorNode = slicer.mrmlScene.AddNewNodeByClass(
@@ -1019,8 +1027,13 @@ class CoronaryCenterlineCrossSectionLogic(ScriptedLoadableModuleLogic):
         editorWidget.setMRMLSegmentEditorNode(editorNode)
         editorWidget.setSegmentationNode(segNode)
     
-        editorWidget.setMasterVolumeNode(referenceVolumeNode)
-    
+        #editorWidget.setMasterVolumeNode(referenceVolumeNode)
+        if hasattr(editorWidget, "setSourceVolumeNode"):
+            editorWidget.setSourceVolumeNode(referenceVolumeNode)
+        else:
+            editorWidget.setMasterVolumeNode(referenceVolumeNode)
+        
+        
         editorWidget.setActiveEffectByName("Smoothing")
         effect = editorWidget.activeEffect()
         effect.setParameter("SmoothingMethod",  "MORPHOLOGICAL")

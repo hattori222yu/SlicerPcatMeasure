@@ -12,8 +12,8 @@ based on coronary centerlines.
 
 ## Requirements
 
-* 3D Slicer 5.0.2
-* Vascular Modeling Toolkit (VMTK) extension (bundled with Slicer)
+* 3D Slicer 5.0.2 or later (tested on 5.8.0)
+* Vascular Modeling Toolkit (VMTK) extension (bundled with Slicer as slicerVMTK)
 
 ## Installation
 
@@ -34,9 +34,6 @@ based on coronary centerlines.
 
 7.Restart 3D Slicer.
 
-Supported version
-
-3D Slicer 5.x (tested with 5.0.2)- The version in which slicerVMTK is installed correctly.
 ## Usage
 
 ### CoronaryCenterlineCrossSection
