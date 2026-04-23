@@ -15,3 +15,5 @@ include(${Slicer_USE_FILE})
 
 add_subdirectory(PcatMeasure)
 add_subdirectory(CoronaryCenterlineCrossSection)
+
+include(${Slicer_EXTENSION_CPACK})
