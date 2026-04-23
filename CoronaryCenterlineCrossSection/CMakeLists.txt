@@ -2,5 +2,5 @@ set(MODULE_NAME CoronaryCenterlineCrossSection)
 
 slicerMacroBuildScriptedModule(
   NAME ${MODULE_NAME}
-  SCRIPT ${MODULE_NAME}.py
+  SCRIPTS ${MODULE_NAME}.py
 )
