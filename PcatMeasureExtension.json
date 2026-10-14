@@ -3,6 +3,6 @@
   "category": "Quantification",
   "scm_url": "https://github.com/hattori222yu/SlicerPcatMeasure",
   "scm_revision": "main",
-  "build_subdirectory": ".",
-  "tier": 3
+  "build_subdirectory": ["SlicerVMTK"],
+  "tier": 4
 }

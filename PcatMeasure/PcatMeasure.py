@@ -49,8 +49,8 @@ from save_poly import save_poly
 from create_curved_cylinder_mask import create_curved_cylinder_mask
 from getCTvaluesFromSegmentation import getCTvaluesFromSegmentation
 from extract_centerline_logic import ExtractCenterlineLogic
-logging.getLogger().setLevel(logging.DEBUG)
-
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 #
 # module information
 #
@@ -790,7 +790,7 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                     if len(bifurcation_ids) < 2:
                         raise RuntimeError("LM bifurcation not found")
                     
-                    lcx_root, lad_root = self.loigc.classify_LAD_LCX(branch_ids=bifurcation_ids,
+                    lcx_root, lad_root = self.logic.classify_LAD_LCX(branch_ids=bifurcation_ids,
                                                                      coord_mm=self.coord_mm)
                     
                 if self.coronary_artery_name == "RCA":
@@ -802,13 +802,13 @@ class PcatMeasureWidget(ScriptedLoadableModuleWidget):
                             break
                 elif self.coronary_artery_name=="LAD":
                     
-                    self.default_branch_id = self.collect_until_length(lad_root,
+                    self.default_branch_id = self.logic.collect_until_length(lad_root,
                                                                        mergedCenterlines=self.mergedCenterlines,
                                                                        coord_mm=self.coord_mm,
                                                                        target_len=40.0,
                                                                        angle_th=np.deg2rad(30))
                 elif self.coronary_artery_name=="LCX":
-                    self.default_branch_id = self.collect_until_length(lcx_root, 
+                    self.default_branch_id = self.logic.collect_until_length(lcx_root, 
                                                                        mergedCenterlines=self.mergedCenterlines,
                                                                        coord_mm=self.coord_mm,
                                                                        target_len=40.0,

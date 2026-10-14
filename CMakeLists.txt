@@ -8,7 +8,7 @@ set(EXTENSION_CONTRIBUTORS "Masayuki Hattori (Yamagata University),Daisuke Kinos
 set(EXTENSION_DESCRIPTION "Pericoronary Adipose Tissue (PCAT) measurement and coronary centerline-based cross-sectional analysis for research use.")
 set(EXTENSION_ICONURL "https://raw.githubusercontent.com/hattori222yu/SlicerPcatMeasure/main/icon.png")
 set(EXTENSION_SCREENSHOTURLS "https://raw.githubusercontent.com/hattori222yu/SlicerPcatMeasure/main/PcatMeasure_colormap.png")
-set(EXTENSION_DEPENDS "NA") # Specified as a list or "NA" if no dependencies
+set(EXTENSION_DEPENDS "SlicerVMTK") 
 
 find_package(Slicer REQUIRED)
 include(${Slicer_USE_FILE})

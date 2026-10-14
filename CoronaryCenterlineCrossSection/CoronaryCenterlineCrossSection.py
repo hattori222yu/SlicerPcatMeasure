@@ -7,7 +7,8 @@ from slicer.util import VTKObservationMixin
 import qt
 import logging
 import ctk
-logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 class CoronaryCenterlineCrossSection(ScriptedLoadableModule):
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
